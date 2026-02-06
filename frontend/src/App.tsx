@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -41,14 +41,14 @@ function App() {
   );
 
   // Sync analysis results to local state
-  useState(() => {
+  useEffect(() => {
     if (images.length > 0) {
       setCurrentImages(images);
     }
     if (moodSliders) {
       setCurrentSliders(moodSliders);
     }
-  });
+  }, [images, moodSliders]);
 
   const handleSliderChange = useCallback(
     async (newSliders: MoodSlidersType) => {

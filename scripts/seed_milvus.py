@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Seed Milvus with sample image embeddings for testing.
+Seed Milvus with sample image embeddings using real CLIP embeddings.
 
 This script:
 1. Connects to Milvus
 2. Creates the image_embeddings collection if it doesn't exist
-3. Inserts sample embeddings with placeholder image URLs
+3. Downloads sample images from Unsplash
+4. Computes CLIP embeddings for each image
+5. Inserts embeddings with image URLs
 
 Run from the ml container:
     python /app/scripts/seed_milvus.py
@@ -13,15 +15,22 @@ Run from the ml container:
 
 import os
 import sys
+from io import BytesIO
+
 import numpy as np
+import requests
+from PIL import Image
 from pymilvus import (
-    connections,
     Collection,
     CollectionSchema,
-    FieldSchema,
     DataType,
+    FieldSchema,
+    connections,
     utility,
 )
+
+sys.path.insert(0, "/app")
+from src.bridge import CrossModalBridge
 
 MILVUS_HOST = os.getenv("MILVUS_HOST", "milvus")
 MILVUS_PORT = os.getenv("MILVUS_PORT", "19530")
@@ -68,8 +77,7 @@ def create_collection():
     ]
 
     schema = CollectionSchema(
-        fields=fields,
-        description="Image embeddings for visual search"
+        fields=fields, description="Image embeddings for visual search"
     )
 
     collection = Collection(name=COLLECTION_NAME, schema=schema)
@@ -85,30 +93,57 @@ def create_collection():
     return collection
 
 
-def generate_sample_embeddings(n: int) -> np.ndarray:
-    """Generate random embeddings for testing."""
-    np.random.seed(42)
-    embeddings = np.random.randn(n, EMBEDDING_DIM).astype(np.float32)
-    norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
-    return embeddings / norms
+def download_image(url: str) -> Image.Image:
+    """Download an image from a URL."""
+    response = requests.get(url, timeout=30)
+    response.raise_for_status()
+    return Image.open(BytesIO(response.content)).convert("RGB")
 
 
-def seed_data(collection: Collection, image_urls: list[str]):
+def compute_clip_embeddings(
+    image_urls: list[str], bridge: CrossModalBridge
+) -> tuple[list[str], np.ndarray]:
+    """Download images and compute CLIP embeddings."""
+    embeddings = []
+    valid_urls = []
+
+    for i, url in enumerate(image_urls):
+        print(f"  [{i + 1}/{len(image_urls)}] Processing {url[:60]}...")
+        try:
+            image = download_image(url)
+            embedding = bridge.encode_image(image)
+            embeddings.append(embedding)
+            valid_urls.append(url)
+        except requests.RequestException as e:
+            print(f"    Failed to download: {e}")
+        except Exception as e:
+            print(f"    Failed to encode: {e}")
+
+    return valid_urls, np.array(embeddings, dtype=np.float32)
+
+
+def seed_data(
+    collection: Collection, image_urls: list[str], bridge: CrossModalBridge
+):
     """Insert sample data into the collection."""
-    n = len(image_urls)
-    embeddings = generate_sample_embeddings(n)
+    print(f"Computing CLIP embeddings for {len(image_urls)} images...")
 
-    print(f"Inserting {n} sample images...")
+    valid_urls, embeddings = compute_clip_embeddings(image_urls, bridge)
+
+    if len(valid_urls) == 0:
+        raise RuntimeError("No images were successfully processed")
+
+    print(f"Inserting {len(valid_urls)} images with CLIP embeddings...")
 
     data = [
-        image_urls,
+        valid_urls,
         embeddings.tolist(),
     ]
 
     collection.insert(data)
     collection.flush()
 
-    print(f"Inserted {n} images successfully")
+    print(f"Inserted {len(valid_urls)} images successfully")
 
 
 def main():
@@ -122,6 +157,11 @@ def main():
 
     print("Connected to Milvus")
 
+    print("Loading CLIP model...")
+    bridge = CrossModalBridge()
+    bridge.load_model()
+    print("CLIP model ready")
+
     collection = create_collection()
 
     collection.load()
@@ -134,7 +174,7 @@ def main():
             print("Skipping seed data insertion")
             return
 
-    seed_data(collection, SAMPLE_IMAGES)
+    seed_data(collection, SAMPLE_IMAGES, bridge)
 
     collection.load()
     final_count = collection.num_entities

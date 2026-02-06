@@ -53,3 +53,5 @@ ml/models/
 tmp/
 temp/
 *.tmp
+
+.claude/

@@ -5,13 +5,15 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/evoke/backend/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type MLClient struct {
-	conn *grpc.ClientConn
-	addr string
+	conn   *grpc.ClientConn
+	client proto.MLServiceClient
+	addr   string
 }
 
 type AnalysisResult struct {
@@ -34,51 +36,66 @@ func NewMLClient(addr string) (*MLClient, error) {
 		return nil, fmt.Errorf("failed to connect to ML service: %w", err)
 	}
 
+	client := proto.NewMLServiceClient(conn)
+
 	return &MLClient{
-		conn: conn,
-		addr: addr,
+		conn:   conn,
+		client: client,
+		addr:   addr,
 	}, nil
 }
 
 func (c *MLClient) AnalyzeAudio(ctx context.Context, audioData []byte) (*AnalysisResult, error) {
-	// TODO: Replace with actual gRPC call once proto is defined
-	// For now, return stub data for integration testing
+	req := &proto.AnalyzeAudioRequest{
+		AudioData: audioData,
+		Format:    "auto",
+	}
 
-	// Simulated embedding (512 dimensions to match CLIP space)
-	embedding := make([]float32, 512)
-	for i := range embedding {
-		embedding[i] = float32(i%100) / 100.0
+	resp, err := c.client.AnalyzeAudio(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to analyze audio: %w", err)
 	}
 
 	return &AnalysisResult{
-		Embedding:   embedding,
-		MoodEnergy:  0.7,
-		MoodValence: 0.6,
-		MoodTempo:   0.5,
-		MoodTexture: 0.4,
+		Embedding:   resp.Embedding,
+		MoodEnergy:  resp.MoodEnergy,
+		MoodValence: resp.MoodValence,
+		MoodTempo:   resp.MoodTempo,
+		MoodTexture: resp.MoodTexture,
 	}, nil
 }
 
 func (c *MLClient) RefineEmbedding(ctx context.Context, baseEmbedding []float32, energy, valence, tempo, texture float32) ([]float32, error) {
-	// TODO: Replace with actual gRPC call
-	// For now, apply simple linear adjustment to embedding
-
-	refined := make([]float32, len(baseEmbedding))
-	copy(refined, baseEmbedding)
-
-	// Simple mood-based adjustment (placeholder)
-	for i := range refined {
-		adjustment := (energy + valence + tempo + texture) / 4.0 * 0.1
-		refined[i] = refined[i] * (1.0 + adjustment)
+	req := &proto.RefineEmbeddingRequest{
+		BaseEmbedding: baseEmbedding,
+		Energy:        energy,
+		Valence:       valence,
+		Tempo:         tempo,
+		Texture:       texture,
 	}
 
-	return refined, nil
+	resp, err := c.client.RefineEmbedding(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to refine embedding: %w", err)
+	}
+
+	return resp.Embedding, nil
 }
 
 func (c *MLClient) Ping(ctx context.Context) error {
 	if c.conn == nil {
 		return fmt.Errorf("ML client not connected")
 	}
+
+	resp, err := c.client.HealthCheck(ctx, &proto.HealthCheckRequest{})
+	if err != nil {
+		return fmt.Errorf("health check failed: %w", err)
+	}
+
+	if !resp.Healthy {
+		return fmt.Errorf("ML service unhealthy: %s", resp.Message)
+	}
+
 	return nil
 }
 
