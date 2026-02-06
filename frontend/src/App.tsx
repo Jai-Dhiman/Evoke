@@ -1,12 +1,4 @@
 import { useState, useCallback, useEffect } from 'react';
-import {
-  Box,
-  Button,
-  Flex,
-  Heading,
-  Text,
-  Toast,
-} from 'gestalt';
 import { AudioUploader } from './components/AudioUploader';
 import { MoodBoard } from './components/MoodBoard';
 import { MoodSliders } from './components/MoodSliders';
@@ -40,7 +32,6 @@ function App() {
     [analyze]
   );
 
-  // Sync analysis results to local state
   useEffect(() => {
     if (images.length > 0) {
       setCurrentImages(images);
@@ -80,63 +71,150 @@ function App() {
   const error = analysisError || refineError;
 
   return (
-    <Box padding={4} maxWidth={1400} marginStart="auto" marginEnd="auto">
-      <Box marginBottom={6}>
-        <Flex justifyContent="between" alignItems="center">
-          <Heading size="500">Evoke</Heading>
-          {sessionId && (
-            <Button text="Start Over" onClick={handleReset} size="sm" />
-          )}
-        </Flex>
-        <Text color="subtle">Transform music into visual inspiration</Text>
-      </Box>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      minHeight: '100vh',
+      background: 'var(--color-bg)',
+    }}>
+      {/* Top bar */}
+      <header style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: 'var(--space-md) var(--space-lg)',
+        borderBottom: '1px solid var(--color-border-subtle)',
+        flexShrink: 0,
+      }}>
+        <h1 style={{
+          fontFamily: 'var(--font-display)',
+          fontSize: '24px',
+          fontWeight: 400,
+          color: 'var(--color-text)',
+          margin: 0,
+        }}>
+          Evoke
+        </h1>
+        {sessionId && (
+          <button
+            onClick={handleReset}
+            style={{
+              fontFamily: 'var(--font-body)',
+              fontSize: '13px',
+              color: 'var(--color-text-secondary)',
+              background: 'transparent',
+              border: '1px solid var(--color-border)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '6px 16px',
+              cursor: 'pointer',
+              transition: 'color var(--timing-fast) var(--ease-out), border-color var(--timing-fast) var(--ease-out)',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = 'var(--color-text)';
+              e.currentTarget.style.borderColor = 'var(--color-text-muted)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = 'var(--color-text-secondary)';
+              e.currentTarget.style.borderColor = 'var(--color-border)';
+            }}
+          >
+            Start Over
+          </button>
+        )}
+      </header>
 
-      <Flex gap={6} wrap>
-        <Box minWidth={300} maxWidth={400} flex="none">
-          <Flex direction="column" gap={4}>
-            <AudioUploader
-              onUpload={handleUpload}
-              isLoading={isAnalyzing}
-              disabled={isAnalyzing}
+      {/* Main content */}
+      <div style={{
+        display: 'flex',
+        flex: 1,
+        minHeight: 0,
+        overflow: 'hidden',
+      }}>
+        {/* Sidebar */}
+        <aside style={{
+          width: '360px',
+          flexShrink: 0,
+          borderRight: '1px solid var(--color-border-subtle)',
+          overflowY: 'auto',
+          padding: 'var(--space-lg)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--space-lg)',
+        }}>
+          <p style={{
+            fontFamily: 'var(--font-display)',
+            fontStyle: 'italic',
+            fontSize: '15px',
+            color: 'var(--color-text-secondary)',
+            margin: 0,
+            lineHeight: 1.6,
+          }}>
+            Transform music into visual inspiration
+          </p>
+
+          <AudioUploader
+            onUpload={handleUpload}
+            isLoading={isAnalyzing}
+            disabled={isAnalyzing}
+          />
+
+          {audioFile && <WaveformPlayer audioFile={audioFile} />}
+
+          {displaySliders && (
+            <MoodSliders
+              sliders={displaySliders}
+              onChange={handleSliderChange}
+              disabled={isRefining}
             />
+          )}
 
-            {audioFile && <WaveformPlayer audioFile={audioFile} />}
+          {isRefining && (
+            <p style={{
+              fontSize: '13px',
+              color: 'var(--color-text-muted)',
+              margin: 0,
+            }}>
+              Updating board...
+            </p>
+          )}
+        </aside>
 
-            {displaySliders && (
-              <MoodSliders
-                sliders={displaySliders}
-                onChange={handleSliderChange}
-                disabled={isRefining}
-              />
-            )}
+        {/* Main board area */}
+        <main style={{
+          flex: 1,
+          minWidth: 0,
+          overflowY: 'auto',
+        }}>
+          <MoodBoard
+            images={displayImages}
+            onImageClick={handleImageClick}
+            isLoading={isAnalyzing}
+          />
+        </main>
+      </div>
 
-            {isRefining && (
-              <Text size="200" color="subtle">
-                Updating board...
-              </Text>
-            )}
-          </Flex>
-        </Box>
-
-        <Box flex="grow" minWidth={0}>
-          <MoodBoard images={displayImages} onImageClick={handleImageClick} />
-        </Box>
-      </Flex>
-
+      {/* Error toast */}
       {error && (
-        <Box
-          position="fixed"
-          bottom
-          left
-          right
-          padding={4}
-          display="flex"
-          justifyContent="center"
-        >
-          <Toast text={error} />
-        </Box>
+        <div style={{
+          position: 'fixed',
+          bottom: 'var(--space-lg)',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'var(--color-surface-raised)',
+          border: '1px solid var(--color-error)',
+          borderRadius: 'var(--radius-md)',
+          padding: 'var(--space-sm) var(--space-lg)',
+          color: 'var(--color-error)',
+          fontSize: '14px',
+          fontFamily: 'var(--font-body)',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+          zIndex: 1000,
+          animation: 'fade-up var(--timing-normal) var(--ease-out)',
+        }}>
+          {error}
+        </div>
       )}
-    </Box>
+    </div>
   );
 }
 

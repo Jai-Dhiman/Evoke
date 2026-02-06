@@ -2,6 +2,8 @@ export interface ImageResult {
   id: number;
   image_url: string;
   score: number;
+  width?: number;
+  height?: number;
 }
 
 export interface MoodSliders {

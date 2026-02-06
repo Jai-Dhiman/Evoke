@@ -1,11 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
-import { Box, Button, Text, Spinner } from 'gestalt';
 
 interface AudioUploaderProps {
   onUpload: (file: File) => void;
   isLoading: boolean;
   disabled?: boolean;
 }
+
+const VALID_EXTENSIONS = /\.(mp3|wav|ogg|flac)$/i;
+const VALID_TYPES = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/ogg', 'audio/flac'];
 
 export function AudioUploader({
   onUpload,
@@ -15,6 +17,7 @@ export function AudioUploader({
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleClick = useCallback(() => {
     inputRef.current?.click();
@@ -22,9 +25,9 @@ export function AudioUploader({
 
   const handleFile = useCallback(
     (file: File) => {
-      const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp3', 'audio/ogg', 'audio/flac'];
-      if (!validTypes.includes(file.type) && !file.name.match(/\.(mp3|wav|ogg|flac)$/i)) {
-        alert('Please upload an audio file (MP3, WAV, OGG, or FLAC)');
+      setError(null);
+      if (!VALID_TYPES.includes(file.type) && !VALID_EXTENSIONS.test(file.name)) {
+        setError('Please upload an audio file (MP3, WAV, OGG, or FLAC)');
         return;
       }
       setFileName(file.name);
@@ -64,17 +67,15 @@ export function AudioUploader({
     setDragOver(false);
   }, []);
 
+  const className = [
+    'evoke-uploader',
+    dragOver && 'evoke-uploader--drag-over',
+  ].filter(Boolean).join(' ');
+
   return (
-    <Box
-      padding={6}
-      rounding={4}
-      borderStyle="lg"
-      color={dragOver ? 'secondary' : 'default'}
-      display="flex"
-      direction="column"
-      alignItems="center"
-      justifyContent="center"
-      minHeight={200}
+    <div
+      className={className}
+      onClick={isLoading ? undefined : handleClick}
       onDrop={handleDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
@@ -88,32 +89,50 @@ export function AudioUploader({
       />
 
       {isLoading ? (
-        <Box display="flex" direction="column" alignItems="center" gap={4}>
-          <Spinner show accessibilityLabel="Analyzing audio" />
-          <Text>Analyzing your music...</Text>
-        </Box>
+        <>
+          <div className="evoke-dot-pulse">
+            <div className="evoke-dot-pulse__dot" />
+            <div className="evoke-dot-pulse__dot" />
+            <div className="evoke-dot-pulse__dot" />
+          </div>
+          <p style={{
+            fontSize: '14px',
+            color: 'var(--color-text-secondary)',
+            margin: 0,
+          }}>
+            Analyzing your music...
+          </p>
+        </>
       ) : (
-        <Box display="flex" direction="column" alignItems="center" gap={4}>
-          <Text size="400" weight="bold">
-            Drop your audio file here
-          </Text>
-          <Text color="subtle">or</Text>
-          <Button
-            text="Choose File"
-            onClick={handleClick}
+        <>
+          <svg className="evoke-uploader__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12l7-7 7 7" />
+          </svg>
+          <p className="evoke-uploader__title">Drop your audio here</p>
+          <p className="evoke-uploader__subtitle">or</p>
+          <button
+            className="evoke-uploader__choose-btn"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleClick();
+            }}
             disabled={disabled}
-            size="lg"
-          />
+          >
+            Choose File
+          </button>
           {fileName && (
-            <Text size="200" color="subtle">
+            <p className="evoke-uploader__file-name">
               Selected: {fileName}
-            </Text>
+            </p>
           )}
-          <Text size="100" color="subtle">
+          {error && (
+            <p className="evoke-uploader__error">{error}</p>
+          )}
+          <p className="evoke-uploader__subtitle">
             Supports MP3, WAV, OGG, FLAC (max 30 seconds)
-          </Text>
-        </Box>
+          </p>
+        </>
       )}
-    </Box>
+    </div>
   );
 }
