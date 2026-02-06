@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package evoke;
+
+option go_package = "github.com/evoke/backend/proto";
+
+service MLService {
+  rpc AnalyzeAudio(AnalyzeAudioRequest) returns (AnalyzeAudioResponse);
+  rpc RefineEmbedding(RefineEmbeddingRequest) returns (RefineEmbeddingResponse);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message AnalyzeAudioRequest {
+  bytes audio_data = 1;
+  string format = 2;
+}
+
+message AnalyzeAudioResponse {
+  repeated float embedding = 1;
+  float mood_energy = 2;
+  float mood_valence = 3;
+  float mood_tempo = 4;
+  float mood_texture = 5;
+}
+
+message RefineEmbeddingRequest {
+  repeated float base_embedding = 1;
+  float energy = 2;
+  float valence = 3;
+  float tempo = 4;
+  float texture = 5;
+}
+
+message RefineEmbeddingResponse {
+  repeated float embedding = 1;
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  bool healthy = 1;
+  string message = 2;
+}
