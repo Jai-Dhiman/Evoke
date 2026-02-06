@@ -39,7 +39,10 @@ func (h *HealthHandler) Health(c *gin.Context) {
 	}
 
 	// Check Redis
-	if err := h.cache.Ping(ctx); err != nil {
+	if h.cache == nil {
+		status.Services["redis"] = "error: not connected"
+		status.Status = "degraded"
+	} else if err := h.cache.Ping(ctx); err != nil {
 		status.Services["redis"] = "error: " + err.Error()
 		status.Status = "degraded"
 	} else {
@@ -47,7 +50,10 @@ func (h *HealthHandler) Health(c *gin.Context) {
 	}
 
 	// Check Milvus
-	if err := h.milvus.Ping(ctx); err != nil {
+	if h.milvus == nil {
+		status.Services["milvus"] = "error: not connected"
+		status.Status = "degraded"
+	} else if err := h.milvus.Ping(ctx); err != nil {
 		status.Services["milvus"] = "error: " + err.Error()
 		status.Status = "degraded"
 	} else {
@@ -55,7 +61,10 @@ func (h *HealthHandler) Health(c *gin.Context) {
 	}
 
 	// Check ML Service
-	if err := h.ml.Ping(ctx); err != nil {
+	if h.ml == nil {
+		status.Services["ml"] = "error: not connected"
+		status.Status = "degraded"
+	} else if err := h.ml.Ping(ctx); err != nil {
 		status.Services["ml"] = "error: " + err.Error()
 		status.Status = "degraded"
 	} else {

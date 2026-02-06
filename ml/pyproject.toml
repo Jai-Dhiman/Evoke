@@ -10,8 +10,11 @@ dependencies = [
     "grpcio>=1.60.0",
     "grpcio-tools>=1.60.0",
     "numpy>=1.24.0",
+    "numba>=0.59.0",
+    "llvmlite>=0.42.0",
     "librosa>=0.10.0",
     "soundfile>=0.12.0",
+    "pillow>=10.0.0",
     "pymilvus>=2.4.0",
 ]
 

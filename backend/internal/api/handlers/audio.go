@@ -43,6 +43,11 @@ type AnalyzeResponse struct {
 }
 
 func (h *AudioHandler) CreateSession(c *gin.Context) {
+	if h.cache == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "cache service unavailable"})
+		return
+	}
+
 	sessionID := uuid.New().String()
 
 	session := &services.SessionData{
@@ -63,6 +68,11 @@ func (h *AudioHandler) CreateSession(c *gin.Context) {
 }
 
 func (h *AudioHandler) Analyze(c *gin.Context) {
+	if h.cache == nil || h.ml == nil || h.milvus == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "required services unavailable"})
+		return
+	}
+
 	var req AnalyzeRequest
 	if err := c.ShouldBind(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session_id is required"})

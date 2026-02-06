@@ -48,6 +48,11 @@ type RefineRequest struct {
 }
 
 func (h *BoardHandler) GetBoard(c *gin.Context) {
+	if h.cache == nil || h.milvus == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "required services unavailable"})
+		return
+	}
+
 	var req GetBoardRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "session_id is required"})
@@ -83,6 +88,11 @@ func (h *BoardHandler) GetBoard(c *gin.Context) {
 }
 
 func (h *BoardHandler) Refine(c *gin.Context) {
+	if h.cache == nil || h.ml == nil || h.milvus == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "required services unavailable"})
+		return
+	}
+
 	var req RefineRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})

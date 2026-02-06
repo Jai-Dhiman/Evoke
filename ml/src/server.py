@@ -4,8 +4,9 @@ from concurrent import futures
 import grpc
 import numpy as np
 
-# Add parent directory to path for imports
+# Add parent directory and protos directory to path for imports
 sys.path.insert(0, "/app")
+sys.path.insert(0, "/app/protos")
 
 from src.audio_encoder import AudioEncoder
 from src.bridge import CrossModalBridge
