@@ -123,7 +123,8 @@ class CrossModalBridge:
         inputs = self._clip_processor(images=image, return_tensors="pt").to(self.device)
 
         with torch.no_grad():
-            image_features = self._clip_model.get_image_features(**inputs)
+            output = self._clip_model.get_image_features(**inputs)
+            image_features = output.pooler_output if hasattr(output, 'pooler_output') else output
 
         embedding = image_features.cpu().numpy().flatten()
 
@@ -145,7 +146,8 @@ class CrossModalBridge:
         inputs = self._clip_processor(text=text, return_tensors="pt", padding=True).to(self.device)
 
         with torch.no_grad():
-            text_features = self._clip_model.get_text_features(**inputs)
+            output = self._clip_model.get_text_features(**inputs)
+            text_features = output.pooler_output if hasattr(output, 'pooler_output') else output
 
         embedding = text_features.cpu().numpy().flatten()
 
