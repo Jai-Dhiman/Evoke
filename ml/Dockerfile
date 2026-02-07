@@ -34,11 +34,9 @@ RUN python -c "from transformers import CLIPModel, CLIPProcessor; \
     CLIPModel.from_pretrained('openai/clip-vit-base-patch32', cache_dir='/app/models'); \
     CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32', cache_dir='/app/models')"
 
-# Cloud Run sets PORT; default to 50051
-ENV PORT=50051
+# Cloud Run sets PORT; default to 8080
+ENV PORT=8080
 
-# Expose gRPC port
-EXPOSE 50051
+EXPOSE 8080
 
-# Run the server
-CMD ["python", "-m", "src.server"]
+CMD uvicorn src.http_server:app --host 0.0.0.0 --port ${PORT}

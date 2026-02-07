@@ -7,11 +7,11 @@ all: help
 build:
 	docker compose build
 
-# Start all services
+# Start all services (Docker)
 up:
 	docker compose up -d
 
-# Start with logs
+# Start with logs (Docker)
 dev:
 	docker compose up
 
@@ -47,9 +47,17 @@ precompute-demo:
 # Seed alias (points to precompute now)
 seed: precompute
 
-# Run backend tests
-test-backend:
-	cd backend && go test ./...
+# Run worker locally (requires frontend build)
+worker:
+	cd worker && bun run dev
+
+# Run frontend dev server
+frontend:
+	cd frontend && bun run dev
+
+# Run ML service locally
+ml:
+	cd ml && uv run uvicorn src.http_server:app --port 8000
 
 # Run frontend tests
 test-frontend:
@@ -60,55 +68,47 @@ test-ml:
 	cd ml && uv run pytest
 
 # Run all tests
-test: test-backend test-frontend test-ml
+test: test-frontend test-ml
 
 # Health check
 health:
 	@echo "Checking services..."
-	@curl -s http://localhost:8080/health | jq . || echo "Backend not responding"
+	@curl -s http://localhost:8787/health | jq . || echo "Worker not responding"
 
-# Deploy (build and push to Cloud Run)
-deploy: deploy-ml deploy-backend deploy-frontend
-
+# Deploy ML to Cloud Run
 deploy-ml:
 	gcloud builds submit --tag gcr.io/$(GCP_PROJECT)/evoke-ml ./ml
 	gcloud run deploy evoke-ml \
 		--image gcr.io/$(GCP_PROJECT)/evoke-ml \
 		--region us-central1 \
 		--allow-unauthenticated \
-		--use-http2 \
 		--memory 2Gi --cpu 2 \
 		--min-instances 0 --max-instances 1 \
 		--timeout 300 --cpu-boost
 
-deploy-backend:
-	gcloud builds submit --tag gcr.io/$(GCP_PROJECT)/evoke-backend ./backend
-	gcloud run deploy evoke-backend \
-		--image gcr.io/$(GCP_PROJECT)/evoke-backend \
-		--region us-central1 \
-		--allow-unauthenticated \
-		--memory 256Mi --cpu 1 \
-		--min-instances 0 --max-instances 2
-
-deploy-frontend:
+# Deploy Worker to Cloudflare
+deploy-worker:
 	cd frontend && bun run build
-	cd frontend && npx wrangler pages deploy dist --project-name evoke
+	cd worker && bun run deploy
+
+# Deploy all
+deploy: deploy-ml deploy-worker
 
 # Help
 help:
 	@echo "Evoke - Music to Visual Inspiration"
 	@echo ""
 	@echo "Usage:"
-	@echo "  make build             Build all Docker images"
-	@echo "  make up                Start all services (detached)"
-	@echo "  make dev               Start all services with logs"
-	@echo "  make down              Stop all services"
+	@echo "  make build             Build Docker images"
+	@echo "  make up                Start Docker services (detached)"
+	@echo "  make dev               Start Docker services with logs"
+	@echo "  make down              Stop Docker services"
 	@echo "  make logs              View service logs"
 	@echo "  make clean             Remove containers and volumes"
-	@echo "  make init-data         Create data directories"
-	@echo "  make download-models   Download ML models"
+	@echo "  make worker            Run Hono worker locally (:8787)"
+	@echo "  make frontend          Run frontend dev server (:3000)"
+	@echo "  make ml                Run ML service locally (:8000)"
 	@echo "  make precompute        Pre-compute deployment data"
-	@echo "  make seed              Alias for precompute"
 	@echo "  make test              Run all tests"
 	@echo "  make health            Check service health"
 	@echo "  make deploy            Deploy all services"

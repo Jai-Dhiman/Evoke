@@ -3,7 +3,7 @@ import { api } from '../api/client';
 import type { AnalyzeResponse, MoodSliders, ImageResult } from '../types';
 
 interface UseAudioAnalysisReturn {
-  sessionId: string | null;
+  embedding: number[] | null;
   isAnalyzing: boolean;
   isDemo: boolean;
   error: string | null;
@@ -15,7 +15,7 @@ interface UseAudioAnalysisReturn {
 }
 
 export function useAudioAnalysis(): UseAudioAnalysisReturn {
-  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [embedding, setEmbedding] = useState<number[] | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,16 +28,9 @@ export function useAudioAnalysis(): UseAudioAnalysisReturn {
     setIsDemo(false);
 
     try {
-      // Create a new session
-      const session = await api.createSession();
-      setSessionId(session.session_id);
+      const result: AnalyzeResponse = await api.analyzeAudio(file);
 
-      // Analyze the audio
-      const result: AnalyzeResponse = await api.analyzeAudio(
-        session.session_id,
-        file
-      );
-
+      setEmbedding(result.embedding);
       setMoodSliders({
         energy: result.mood_energy,
         valence: result.mood_valence,
@@ -59,7 +52,7 @@ export function useAudioAnalysis(): UseAudioAnalysisReturn {
 
     try {
       const result: AnalyzeResponse = await api.demo();
-      setSessionId(result.session_id);
+      setEmbedding(result.embedding);
       setIsDemo(true);
       setMoodSliders({
         energy: result.mood_energy,
@@ -77,7 +70,7 @@ export function useAudioAnalysis(): UseAudioAnalysisReturn {
   }, []);
 
   const reset = useCallback(() => {
-    setSessionId(null);
+    setEmbedding(null);
     setIsDemo(false);
     setMoodSliders(null);
     setImages([]);
@@ -85,7 +78,7 @@ export function useAudioAnalysis(): UseAudioAnalysisReturn {
   }, []);
 
   return {
-    sessionId,
+    embedding,
     isAnalyzing,
     isDemo,
     error,

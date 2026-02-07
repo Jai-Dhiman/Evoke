@@ -13,12 +13,32 @@ class CrossModalBridge:
     queries can retrieve visually similar images.
     """
 
+    MOOD_PROMPTS = {
+        "energy": {
+            "high": ["intense", "powerful", "vibrant", "explosive", "dynamic"],
+            "low": ["calm", "peaceful", "serene", "tranquil", "gentle"],
+        },
+        "valence": {
+            "high": ["bright", "joyful", "warm", "colorful", "cheerful"],
+            "low": ["dark", "melancholic", "moody", "somber", "cold"],
+        },
+        "tempo": {
+            "high": ["rapid", "energetic", "racing", "urgent", "frenetic"],
+            "low": ["slow", "languid", "still", "frozen", "meditative"],
+        },
+        "texture": {
+            "high": ["intricate", "complex", "detailed", "layered", "ornate"],
+            "low": ["minimal", "clean", "simple", "sparse", "bare"],
+        },
+    }
+
     def __init__(self):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.embedding_dim = config.EMBEDDING_DIM
 
         self._clip_model = None
         self._clip_processor = None
+        self._direction_vectors = None
 
         # Learned projection matrix (placeholder - would be trained)
         self._projection = None
@@ -82,25 +102,15 @@ class CrossModalBridge:
         """
         self.load_model()
 
-        # Create mood adjustment vector
-        # These directions would ideally be learned from data
+        if self._direction_vectors is None:
+            self._direction_vectors = self.compute_direction_vectors()
+
+        # Create mood adjustment vector using semantic CLIP directions
         adjustment = np.zeros(self.embedding_dim, dtype=np.float32)
-
-        # Energy: affects overall intensity/brightness
-        energy_direction = np.linspace(-1, 1, self.embedding_dim)
-        adjustment += energy_direction * (energy - 0.5) * 0.2
-
-        # Valence: affects warmth/coolness
-        valence_direction = np.sin(np.linspace(0, 4 * np.pi, self.embedding_dim))
-        adjustment += valence_direction * (valence - 0.5) * 0.2
-
-        # Tempo: affects dynamism/motion
-        tempo_direction = np.cos(np.linspace(0, 2 * np.pi, self.embedding_dim))
-        adjustment += tempo_direction * (tempo - 0.5) * 0.15
-
-        # Texture: affects complexity/detail
-        texture_direction = np.random.RandomState(42).randn(self.embedding_dim) * 0.5
-        adjustment += texture_direction * (texture - 0.5) * 0.15
+        adjustment += self._direction_vectors["energy"] * (energy - 0.5) * 0.2
+        adjustment += self._direction_vectors["valence"] * (valence - 0.5) * 0.2
+        adjustment += self._direction_vectors["tempo"] * (tempo - 0.5) * 0.15
+        adjustment += self._direction_vectors["texture"] * (texture - 0.5) * 0.15
 
         # Apply adjustment
         refined = base_embedding + adjustment
@@ -157,3 +167,26 @@ class CrossModalBridge:
             embedding = embedding / norm
 
         return embedding.astype(np.float32)
+
+    def compute_direction_vectors(self) -> dict[str, np.ndarray]:
+        """
+        Compute semantic direction vectors from CLIP text embeddings.
+
+        For each mood dimension, encodes high/low text prompts and computes
+        the direction as mean(high) - mean(low), L2-normalized.
+        """
+        self.load_model()
+
+        directions = {}
+        for mood, prompts in self.MOOD_PROMPTS.items():
+            high_embeddings = np.stack([self.encode_text(w) for w in prompts["high"]])
+            low_embeddings = np.stack([self.encode_text(w) for w in prompts["low"]])
+
+            direction = high_embeddings.mean(axis=0) - low_embeddings.mean(axis=0)
+            norm = np.linalg.norm(direction)
+            if norm > 0:
+                direction = direction / norm
+
+            directions[mood] = direction.astype(np.float32)
+
+        return directions

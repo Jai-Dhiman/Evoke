@@ -1,8 +1,7 @@
 import type {
-  SessionResponse,
   AnalyzeResponse,
-  BoardResponse,
   RefineRequest,
+  RefineResponse,
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
@@ -35,12 +34,8 @@ async function request<T>(
 }
 
 export const api = {
-  createSession: (): Promise<SessionResponse> =>
-    request('/api/sessions', { method: 'POST' }),
-
-  analyzeAudio: (sessionId: string, audioFile: File): Promise<AnalyzeResponse> => {
+  analyzeAudio: (audioFile: File): Promise<AnalyzeResponse> => {
     const formData = new FormData();
-    formData.append('session_id', sessionId);
     formData.append('audio', audioFile);
 
     return request('/api/analyze', {
@@ -49,10 +44,7 @@ export const api = {
     });
   },
 
-  getBoard: (sessionId: string): Promise<BoardResponse> =>
-    request(`/api/board?session_id=${encodeURIComponent(sessionId)}`),
-
-  refine: (data: RefineRequest): Promise<BoardResponse> =>
+  refine: (data: RefineRequest): Promise<RefineResponse> =>
     request('/api/refine', {
       method: 'POST',
       headers: {

@@ -9,7 +9,7 @@ import type { MoodSliders as MoodSlidersType, ImageResult } from './types';
 
 function App() {
   const {
-    sessionId,
+    embedding,
     isAnalyzing,
     isDemo,
     error: analysisError,
@@ -73,14 +73,14 @@ function App() {
     async (newSliders: MoodSlidersType) => {
       setCurrentSliders(newSliders);
 
-      if (sessionId) {
-        const result = await refine(sessionId, newSliders);
+      if (embedding) {
+        const result = await refine(embedding, newSliders);
         if (result) {
           setCurrentImages(result.images);
         }
       }
     },
-    [sessionId, refine]
+    [embedding, refine]
   );
 
   const handleReset = useCallback(() => {
@@ -124,7 +124,7 @@ function App() {
         }}>
           Evoke
         </h1>
-        {sessionId && (
+        {embedding && (
           <button
             onClick={handleReset}
             style={{
@@ -181,7 +181,7 @@ function App() {
             Transform music into visual inspiration
           </p>
 
-          {!sessionId && !isAnalyzing && (
+          {!embedding && !isAnalyzing && (
             <>
               <AudioUploader
                 onUpload={handleUpload}
@@ -230,7 +230,7 @@ function App() {
             </>
           )}
 
-          {sessionId && !isAnalyzing && (
+          {embedding && !isAnalyzing && (
             <AudioUploader
               onUpload={handleUpload}
               isLoading={isAnalyzing}

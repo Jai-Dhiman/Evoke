@@ -6,7 +6,7 @@ interface UseMoodBoardReturn {
   isRefining: boolean;
   error: string | null;
   refine: (
-    sessionId: string,
+    embedding: number[],
     sliders: MoodSliders
   ) => Promise<{ images: ImageResult[]; sliders: MoodSliders } | null>;
 }
@@ -18,7 +18,7 @@ export function useMoodBoard(): UseMoodBoardReturn {
 
   const refine = useCallback(
     async (
-      sessionId: string,
+      embedding: number[],
       sliders: MoodSliders
     ): Promise<{ images: ImageResult[]; sliders: MoodSliders } | null> => {
       // Clear any pending debounce
@@ -33,7 +33,7 @@ export function useMoodBoard(): UseMoodBoardReturn {
 
           try {
             const result = await api.refine({
-              session_id: sessionId,
+              embedding,
               energy: sliders.energy,
               valence: sliders.valence,
               tempo: sliders.tempo,

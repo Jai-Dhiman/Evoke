@@ -1,0 +1,9 @@
+name = "evoke"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "../frontend/dist"
+
+[vars]
+ML_SERVICE_URL = "https://evoke-ml-XXXXX.run.app"
