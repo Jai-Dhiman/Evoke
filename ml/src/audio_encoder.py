@@ -154,7 +154,7 @@ class AudioEncoder:
         embedding_parts.append(spectral_stats)
 
         # Rhythm features (8 values)
-        tempo_normalized = features["tempo"] / 200.0  # Normalize tempo
+        tempo_normalized = float(np.asarray(features["tempo"]).flat[0]) / 200.0
         onset_stats = np.array([
             features["onset_env"].mean(),
             features["onset_env"].std(),

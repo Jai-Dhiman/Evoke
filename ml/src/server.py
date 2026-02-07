@@ -5,8 +5,10 @@ import grpc
 import numpy as np
 
 # Add parent directory and protos directory to path for imports
-sys.path.insert(0, "/app")
-sys.path.insert(0, "/app/protos")
+import os
+_ml_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, _ml_root)
+sys.path.insert(0, os.path.join(_ml_root, "protos"))
 
 from src.audio_encoder import AudioEncoder
 from src.bridge import CrossModalBridge
