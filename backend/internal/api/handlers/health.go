@@ -2,25 +2,27 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 
 	"github.com/evoke/backend/internal/services"
+	"github.com/evoke/backend/internal/vectorstore"
 )
 
 type HealthHandler struct {
-	cache  *services.CacheService
-	milvus *services.MilvusService
-	ml     *services.MLClient
+	cache *services.CacheService
+	vs    *vectorstore.VectorStore
+	ml    *services.MLClient
 }
 
-func NewHealthHandler(cache *services.CacheService, milvus *services.MilvusService, ml *services.MLClient) *HealthHandler {
+func NewHealthHandler(cache *services.CacheService, vs *vectorstore.VectorStore, ml *services.MLClient) *HealthHandler {
 	return &HealthHandler{
-		cache:  cache,
-		milvus: milvus,
-		ml:     ml,
+		cache: cache,
+		vs:    vs,
+		ml:    ml,
 	}
 }
 
@@ -49,24 +51,19 @@ func (h *HealthHandler) Health(c *gin.Context) {
 		status.Services["redis"] = "ok"
 	}
 
-	// Check Milvus
-	if h.milvus == nil {
-		status.Services["milvus"] = "error: not connected"
-		status.Status = "degraded"
-	} else if err := h.milvus.Ping(ctx); err != nil {
-		status.Services["milvus"] = "error: " + err.Error()
+	// Check VectorStore (always passes since data is embedded)
+	if h.vs == nil {
+		status.Services["vectorstore"] = "error: not loaded"
 		status.Status = "degraded"
 	} else {
-		status.Services["milvus"] = "ok"
+		status.Services["vectorstore"] = fmt.Sprintf("ok (%d images)", h.vs.ImageCount())
 	}
 
 	// Check ML Service
 	if h.ml == nil {
-		status.Services["ml"] = "error: not connected"
-		status.Status = "degraded"
+		status.Services["ml"] = "not configured"
 	} else if err := h.ml.Ping(ctx); err != nil {
-		status.Services["ml"] = "error: " + err.Error()
-		status.Status = "degraded"
+		status.Services["ml"] = "cold (will start on demand)"
 	} else {
 		status.Services["ml"] = "ok"
 	}

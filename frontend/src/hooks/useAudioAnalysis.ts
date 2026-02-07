@@ -5,16 +5,19 @@ import type { AnalyzeResponse, MoodSliders, ImageResult } from '../types';
 interface UseAudioAnalysisReturn {
   sessionId: string | null;
   isAnalyzing: boolean;
+  isDemo: boolean;
   error: string | null;
   moodSliders: MoodSliders | null;
   images: ImageResult[];
   analyze: (file: File) => Promise<void>;
+  loadDemo: () => Promise<void>;
   reset: () => void;
 }
 
 export function useAudioAnalysis(): UseAudioAnalysisReturn {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [moodSliders, setMoodSliders] = useState<MoodSliders | null>(null);
   const [images, setImages] = useState<ImageResult[]>([]);
@@ -22,6 +25,7 @@ export function useAudioAnalysis(): UseAudioAnalysisReturn {
   const analyze = useCallback(async (file: File) => {
     setIsAnalyzing(true);
     setError(null);
+    setIsDemo(false);
 
     try {
       // Create a new session
@@ -49,8 +53,32 @@ export function useAudioAnalysis(): UseAudioAnalysisReturn {
     }
   }, []);
 
+  const loadDemo = useCallback(async () => {
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      const result: AnalyzeResponse = await api.demo();
+      setSessionId(result.session_id);
+      setIsDemo(true);
+      setMoodSliders({
+        energy: result.mood_energy,
+        valence: result.mood_valence,
+        tempo: result.mood_tempo,
+        texture: result.mood_texture,
+      });
+      setImages(result.images);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load demo';
+      setError(message);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  }, []);
+
   const reset = useCallback(() => {
     setSessionId(null);
+    setIsDemo(false);
     setMoodSliders(null);
     setImages([]);
     setError(null);
@@ -59,10 +87,12 @@ export function useAudioAnalysis(): UseAudioAnalysisReturn {
   return {
     sessionId,
     isAnalyzing,
+    isDemo,
     error,
     moodSliders,
     images,
     analyze,
+    loadDemo,
     reset,
   };
 }

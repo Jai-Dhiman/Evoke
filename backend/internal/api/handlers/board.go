@@ -6,19 +6,18 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/evoke/backend/internal/services"
+	"github.com/evoke/backend/internal/vectorstore"
 )
 
 type BoardHandler struct {
-	cache  *services.CacheService
-	milvus *services.MilvusService
-	ml     *services.MLClient
+	cache *services.CacheService
+	vs    *vectorstore.VectorStore
 }
 
-func NewBoardHandler(cache *services.CacheService, milvus *services.MilvusService, ml *services.MLClient) *BoardHandler {
+func NewBoardHandler(cache *services.CacheService, vs *vectorstore.VectorStore) *BoardHandler {
 	return &BoardHandler{
-		cache:  cache,
-		milvus: milvus,
-		ml:     ml,
+		cache: cache,
+		vs:    vs,
 	}
 }
 
@@ -31,12 +30,12 @@ type GetBoardRequest struct {
 }
 
 type BoardResponse struct {
-	SessionID   string                 `json:"session_id"`
-	MoodEnergy  float32                `json:"mood_energy"`
-	MoodValence float32                `json:"mood_valence"`
-	MoodTempo   float32                `json:"mood_tempo"`
-	MoodTexture float32                `json:"mood_texture"`
-	Images      []services.ImageResult `json:"images"`
+	SessionID   string                    `json:"session_id"`
+	MoodEnergy  float32                   `json:"mood_energy"`
+	MoodValence float32                   `json:"mood_valence"`
+	MoodTempo   float32                   `json:"mood_tempo"`
+	MoodTexture float32                   `json:"mood_texture"`
+	Images      []vectorstore.ImageResult `json:"images"`
 }
 
 type RefineRequest struct {
@@ -48,7 +47,7 @@ type RefineRequest struct {
 }
 
 func (h *BoardHandler) GetBoard(c *gin.Context) {
-	if h.cache == nil || h.milvus == nil {
+	if h.cache == nil || h.vs == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "required services unavailable"})
 		return
 	}
@@ -71,11 +70,7 @@ func (h *BoardHandler) GetBoard(c *gin.Context) {
 	}
 
 	// Search for images using current embedding
-	images, err := h.milvus.Search(c.Request.Context(), session.Embedding, 20)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search images"})
-		return
-	}
+	images := h.vs.Search(session.Embedding, 20)
 
 	c.JSON(http.StatusOK, BoardResponse{
 		SessionID:   session.SessionID,
@@ -88,7 +83,7 @@ func (h *BoardHandler) GetBoard(c *gin.Context) {
 }
 
 func (h *BoardHandler) Refine(c *gin.Context) {
-	if h.cache == nil || h.ml == nil || h.milvus == nil {
+	if h.cache == nil || h.vs == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "required services unavailable"})
 		return
 	}
@@ -110,19 +105,14 @@ func (h *BoardHandler) Refine(c *gin.Context) {
 		return
 	}
 
-	// Refine embedding based on slider values
-	refinedEmbedding, err := h.ml.RefineEmbedding(
-		c.Request.Context(),
+	// Refine embedding locally using vectorstore direction vectors
+	refinedEmbedding := h.vs.RefineEmbedding(
 		session.Embedding,
 		req.Energy,
 		req.Valence,
 		req.Tempo,
 		req.Texture,
 	)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to refine embedding"})
-		return
-	}
 
 	// Update session with new slider values
 	session.MoodEnergy = req.Energy
@@ -136,11 +126,7 @@ func (h *BoardHandler) Refine(c *gin.Context) {
 	}
 
 	// Search for images with refined embedding
-	images, err := h.milvus.Search(c.Request.Context(), refinedEmbedding, 20)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search images"})
-		return
-	}
+	images := h.vs.Search(refinedEmbedding, 20)
 
 	c.JSON(http.StatusOK, BoardResponse{
 		SessionID:   session.SessionID,

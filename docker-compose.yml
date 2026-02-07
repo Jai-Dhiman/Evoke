@@ -26,14 +26,14 @@ services:
       - REDIS_HOST=${REDIS_HOST:-redis}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
-      - MILVUS_HOST=${MILVUS_HOST:-milvus}
-      - MILVUS_PORT=${MILVUS_PORT:-19530}
+      - REDIS_URL=${REDIS_URL:-}
       - ML_SERVICE_HOST=${ML_SERVICE_HOST:-ml}
       - ML_SERVICE_PORT=${ML_SERVICE_PORT:-50051}
+      - ML_SERVICE_TLS=${ML_SERVICE_TLS:-false}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
       - SESSION_TTL_HOURS=${SESSION_TTL_HOURS:-1}
     depends_on:
       - redis
-      - milvus
       - ml
 
   ml:
@@ -43,15 +43,11 @@ services:
     ports:
       - "${ML_SERVICE_PORT:-50051}:50051"
     environment:
-      - GRPC_PORT=50051
-      - MILVUS_HOST=${MILVUS_HOST:-milvus}
-      - MILVUS_PORT=${MILVUS_PORT:-19530}
+      - PORT=50051
     volumes:
       - ./ml/models:/app/models
       - ./data:/app/data
       - ./scripts:/app/scripts
-    depends_on:
-      - milvus
 
   redis:
     image: redis:7-alpine
@@ -61,63 +57,5 @@ services:
     volumes:
       - redis_data:/data
 
-  etcd:
-    image: quay.io/coreos/etcd:v3.5.5
-    environment:
-      - ETCD_AUTO_COMPACTION_MODE=revision
-      - ETCD_AUTO_COMPACTION_RETENTION=1000
-      - ETCD_QUOTA_BACKEND_BYTES=4294967296
-      - ETCD_SNAPSHOT_COUNT=50000
-    volumes:
-      - etcd_data:/etcd
-    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
-  minio:
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
-    environment:
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-    ports:
-      - "9001:9001"
-      - "9000:9000"
-    volumes:
-      - minio_data:/minio_data
-    command: minio server /minio_data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
-  milvus:
-    image: milvusdb/milvus:v2.4.0
-    command: ["milvus", "run", "standalone"]
-    security_opt:
-      - seccomp:unconfined
-    environment:
-      ETCD_ENDPOINTS: etcd:2379
-      MINIO_ADDRESS: minio:9000
-    volumes:
-      - milvus_data:/var/lib/milvus
-    ports:
-      - "${MILVUS_PORT:-19530}:19530"
-      - "9091:9091"
-    depends_on:
-      - etcd
-      - minio
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-      interval: 30s
-      timeout: 20s
-      retries: 3
-
 volumes:
   redis_data:
-  etcd_data:
-  minio_data:
-  milvus_data:

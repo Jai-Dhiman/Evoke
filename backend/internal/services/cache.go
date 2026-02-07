@@ -45,6 +45,27 @@ func NewCacheService(addr, password string, ttl time.Duration) (*CacheService, e
 	}, nil
 }
 
+func NewCacheServiceFromURL(redisURL string, ttl time.Duration) (*CacheService, error) {
+	opts, err := redis.ParseURL(redisURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse Redis URL: %w", err)
+	}
+
+	client := redis.NewClient(opts)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := client.Ping(ctx).Err(); err != nil {
+		return nil, fmt.Errorf("failed to connect to Redis: %w", err)
+	}
+
+	return &CacheService{
+		client: client,
+		ttl:    ttl,
+	}, nil
+}
+
 func (c *CacheService) SaveSession(ctx context.Context, session *SessionData) error {
 	data, err := json.Marshal(session)
 	if err != nil {

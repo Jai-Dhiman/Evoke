@@ -9,19 +9,20 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/evoke/backend/internal/services"
+	"github.com/evoke/backend/internal/vectorstore"
 )
 
 type AudioHandler struct {
-	cache  *services.CacheService
-	milvus *services.MilvusService
-	ml     *services.MLClient
+	cache *services.CacheService
+	vs    *vectorstore.VectorStore
+	ml    *services.MLClient
 }
 
-func NewAudioHandler(cache *services.CacheService, milvus *services.MilvusService, ml *services.MLClient) *AudioHandler {
+func NewAudioHandler(cache *services.CacheService, vs *vectorstore.VectorStore, ml *services.MLClient) *AudioHandler {
 	return &AudioHandler{
-		cache:  cache,
-		milvus: milvus,
-		ml:     ml,
+		cache: cache,
+		vs:    vs,
+		ml:    ml,
 	}
 }
 
@@ -34,12 +35,12 @@ type AnalyzeRequest struct {
 }
 
 type AnalyzeResponse struct {
-	SessionID   string                  `json:"session_id"`
-	MoodEnergy  float32                 `json:"mood_energy"`
-	MoodValence float32                 `json:"mood_valence"`
-	MoodTempo   float32                 `json:"mood_tempo"`
-	MoodTexture float32                 `json:"mood_texture"`
-	Images      []services.ImageResult  `json:"images"`
+	SessionID   string                   `json:"session_id"`
+	MoodEnergy  float32                  `json:"mood_energy"`
+	MoodValence float32                  `json:"mood_valence"`
+	MoodTempo   float32                  `json:"mood_tempo"`
+	MoodTexture float32                  `json:"mood_texture"`
+	Images      []vectorstore.ImageResult `json:"images"`
 }
 
 func (h *AudioHandler) CreateSession(c *gin.Context) {
@@ -68,7 +69,7 @@ func (h *AudioHandler) CreateSession(c *gin.Context) {
 }
 
 func (h *AudioHandler) Analyze(c *gin.Context) {
-	if h.cache == nil || h.ml == nil || h.milvus == nil {
+	if h.cache == nil || h.ml == nil || h.vs == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "required services unavailable"})
 		return
 	}
@@ -120,11 +121,7 @@ func (h *AudioHandler) Analyze(c *gin.Context) {
 	}
 
 	// Search for similar images
-	images, err := h.milvus.Search(c.Request.Context(), result.Embedding, 20)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to search images"})
-		return
-	}
+	images := h.vs.Search(result.Embedding, 20)
 
 	c.JSON(http.StatusOK, AnalyzeResponse{
 		SessionID:   session.SessionID,

@@ -61,6 +61,9 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  demo: (): Promise<AnalyzeResponse> =>
+    request('/api/demo', { method: 'POST' }),
+
   healthCheck: (): Promise<{ status: string; services: Record<string, string> }> =>
     request('/health'),
 };

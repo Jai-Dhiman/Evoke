@@ -2,11 +2,13 @@ package services
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"time"
 
 	"github.com/evoke/backend/proto"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
@@ -24,16 +26,17 @@ type AnalysisResult struct {
 	MoodTexture float32   `json:"mood_texture"`
 }
 
-func NewMLClient(addr string) (*MLClient, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+func NewMLClient(addr string, useTLS bool) (*MLClient, error) {
+	var creds grpc.DialOption
+	if useTLS {
+		creds = grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{}))
+	} else {
+		creds = grpc.WithTransportCredentials(insecure.NewCredentials())
+	}
 
-	conn, err := grpc.DialContext(ctx, addr,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
-	)
+	conn, err := grpc.NewClient(addr, creds)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to ML service: %w", err)
+		return nil, fmt.Errorf("failed to create ML client: %w", err)
 	}
 
 	client := proto.NewMLServiceClient(conn)
@@ -46,6 +49,9 @@ func NewMLClient(addr string) (*MLClient, error) {
 }
 
 func (c *MLClient) AnalyzeAudio(ctx context.Context, audioData []byte) (*AnalysisResult, error) {
+	ctx, cancel := context.WithTimeout(ctx, 120*time.Second)
+	defer cancel()
+
 	req := &proto.AnalyzeAudioRequest{
 		AudioData: audioData,
 		Format:    "auto",
@@ -86,6 +92,9 @@ func (c *MLClient) Ping(ctx context.Context) error {
 	if c.conn == nil {
 		return fmt.Errorf("ML client not connected")
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 
 	resp, err := c.client.HealthCheck(ctx, &proto.HealthCheckRequest{})
 	if err != nil {

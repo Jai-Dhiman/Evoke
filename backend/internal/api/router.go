@@ -6,22 +6,24 @@ import (
 
 	"github.com/evoke/backend/internal/api/handlers"
 	"github.com/evoke/backend/internal/services"
+	"github.com/evoke/backend/internal/vectorstore"
 )
 
-func NewRouter(cache *services.CacheService, milvus *services.MilvusService, ml *services.MLClient) *gin.Engine {
+func NewRouter(cache *services.CacheService, vs *vectorstore.VectorStore, ml *services.MLClient, allowedOrigins []string) *gin.Engine {
 	router := gin.Default()
 
 	// CORS configuration
 	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000", "http://localhost:5173"}
+	config.AllowOrigins = allowedOrigins
 	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"}
 	config.AllowHeaders = []string{"Origin", "Content-Type", "Accept", "Authorization"}
 	router.Use(cors.New(config))
 
 	// Initialize handlers
-	healthHandler := handlers.NewHealthHandler(cache, milvus, ml)
-	audioHandler := handlers.NewAudioHandler(cache, milvus, ml)
-	boardHandler := handlers.NewBoardHandler(cache, milvus, ml)
+	healthHandler := handlers.NewHealthHandler(cache, vs, ml)
+	audioHandler := handlers.NewAudioHandler(cache, vs, ml)
+	boardHandler := handlers.NewBoardHandler(cache, vs)
+	demoHandler := handlers.NewDemoHandler(vs, cache, ml)
 
 	// Health check
 	router.GET("/health", healthHandler.Health)
@@ -34,6 +36,9 @@ func NewRouter(cache *services.CacheService, milvus *services.MilvusService, ml 
 
 		// Audio analysis
 		api.POST("/analyze", audioHandler.Analyze)
+
+		// Demo
+		api.POST("/demo", demoHandler.Demo)
 
 		// Board operations
 		api.GET("/board", boardHandler.GetBoard)

@@ -11,10 +11,12 @@ function App() {
   const {
     sessionId,
     isAnalyzing,
+    isDemo,
     error: analysisError,
     moodSliders,
     images,
     analyze,
+    loadDemo,
     reset,
   } = useAudioAnalysis();
 
@@ -23,6 +25,7 @@ function App() {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [currentImages, setCurrentImages] = useState<ImageResult[]>([]);
   const [currentSliders, setCurrentSliders] = useState<MoodSlidersType | null>(null);
+  const [showSlowMessage, setShowSlowMessage] = useState(false);
 
   const handleUpload = useCallback(
     async (file: File) => {
@@ -32,6 +35,21 @@ function App() {
     [analyze]
   );
 
+  const handleDemo = useCallback(async () => {
+    await loadDemo();
+    // Fetch demo.mp3 so WaveformPlayer works
+    try {
+      const response = await fetch('/demo.mp3');
+      if (response.ok) {
+        const blob = await response.blob();
+        const file = new File([blob], 'demo.mp3', { type: 'audio/mpeg' });
+        setAudioFile(file);
+      }
+    } catch {
+      // Demo audio is optional for waveform display
+    }
+  }, [loadDemo]);
+
   useEffect(() => {
     if (images.length > 0) {
       setCurrentImages(images);
@@ -40,6 +58,16 @@ function App() {
       setCurrentSliders(moodSliders);
     }
   }, [images, moodSliders]);
+
+  // Show slow message after 5 seconds of analyzing
+  useEffect(() => {
+    if (!isAnalyzing) {
+      setShowSlowMessage(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowSlowMessage(true), 5000);
+    return () => clearTimeout(timer);
+  }, [isAnalyzing]);
 
   const handleSliderChange = useCallback(
     async (newSliders: MoodSlidersType) => {
@@ -60,6 +88,7 @@ function App() {
     setAudioFile(null);
     setCurrentImages([]);
     setCurrentSliders(null);
+    setShowSlowMessage(false);
   }, [reset]);
 
   const handleImageClick = useCallback((image: ImageResult) => {
@@ -152,13 +181,103 @@ function App() {
             Transform music into visual inspiration
           </p>
 
-          <AudioUploader
-            onUpload={handleUpload}
-            isLoading={isAnalyzing}
-            disabled={isAnalyzing}
-          />
+          {!sessionId && !isAnalyzing && (
+            <>
+              <AudioUploader
+                onUpload={handleUpload}
+                isLoading={isAnalyzing}
+                disabled={isAnalyzing}
+              />
 
-          {audioFile && <WaveformPlayer audioFile={audioFile} />}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--space-sm)',
+              }}>
+                <div style={{ flex: 1, height: '1px', background: 'var(--color-border-subtle)' }} />
+                <span style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '12px',
+                  color: 'var(--color-text-muted)',
+                  padding: '0 var(--space-xs)',
+                }}>or</span>
+                <div style={{ flex: 1, height: '1px', background: 'var(--color-border-subtle)' }} />
+              </div>
+
+              <button
+                onClick={handleDemo}
+                style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '14px',
+                  color: 'var(--color-text)',
+                  background: 'var(--color-surface-raised)',
+                  border: '1px solid var(--color-border)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '12px 24px',
+                  cursor: 'pointer',
+                  transition: 'border-color var(--timing-fast) var(--ease-out), background var(--timing-fast) var(--ease-out)',
+                  width: '100%',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-text-muted)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = 'var(--color-border)';
+                }}
+              >
+                Try Demo
+              </button>
+            </>
+          )}
+
+          {sessionId && !isAnalyzing && (
+            <AudioUploader
+              onUpload={handleUpload}
+              isLoading={isAnalyzing}
+              disabled={isAnalyzing}
+            />
+          )}
+
+          {isAnalyzing && (
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 'var(--space-sm)',
+              padding: 'var(--space-lg) 0',
+            }}>
+              <p style={{
+                fontSize: '14px',
+                color: 'var(--color-text-secondary)',
+                margin: 0,
+              }}>
+                Analyzing...
+              </p>
+              {showSlowMessage && (
+                <p style={{
+                  fontSize: '13px',
+                  color: 'var(--color-text-muted)',
+                  margin: 0,
+                  textAlign: 'center',
+                }}>
+                  Warming up the model, this may take a moment...
+                </p>
+              )}
+            </div>
+          )}
+
+          {audioFile && !isAnalyzing && <WaveformPlayer audioFile={audioFile} />}
+
+          {isDemo && !isAnalyzing && (
+            <p style={{
+              fontSize: '13px',
+              color: 'var(--color-text-muted)',
+              margin: 0,
+              lineHeight: 1.5,
+            }}>
+              Listening to a demo track. Upload your own for a custom board.
+            </p>
+          )}
 
           {displaySliders && (
             <MoodSliders

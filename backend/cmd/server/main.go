@@ -12,47 +12,47 @@ import (
 	"github.com/evoke/backend/internal/api"
 	"github.com/evoke/backend/internal/config"
 	"github.com/evoke/backend/internal/services"
+	"github.com/evoke/backend/internal/vectorstore"
 )
 
 func main() {
 	cfg := config.Load()
 
+	// Initialize VectorStore (embedded data, must succeed)
+	vs, err := vectorstore.New()
+	if err != nil {
+		log.Fatalf("Failed to load vector store: %v", err)
+	}
+	log.Printf("VectorStore loaded: %d images", vs.ImageCount())
+
 	// Initialize Redis cache
-	cache, err := services.NewCacheService(cfg.RedisAddr(), cfg.RedisPassword, cfg.SessionTTL)
+	var cache *services.CacheService
+	if cfg.RedisURL != "" {
+		cache, err = services.NewCacheServiceFromURL(cfg.RedisURL, cfg.SessionTTL)
+	} else {
+		cache, err = services.NewCacheService(cfg.RedisAddr(), cfg.RedisPassword, cfg.SessionTTL)
+	}
 	if err != nil {
 		log.Printf("Warning: Failed to connect to Redis: %v", err)
 		log.Printf("Continuing without Redis (some features may not work)")
 	}
 
-	// Initialize Milvus
-	milvus, err := services.NewMilvusService(cfg.MilvusAddr())
+	// Initialize ML client (non-blocking, lazy connection)
+	ml, err := services.NewMLClient(cfg.MLServiceAddr(), cfg.MLServiceTLS)
 	if err != nil {
-		log.Printf("Warning: Failed to connect to Milvus: %v", err)
-		log.Printf("Continuing without Milvus (search will not work)")
-	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		if err := milvus.EnsureCollection(ctx); err != nil {
-			log.Printf("Warning: Failed to ensure Milvus collection: %v", err)
-		}
-		cancel()
-	}
-
-	// Initialize ML client
-	ml, err := services.NewMLClient(cfg.MLServiceAddr())
-	if err != nil {
-		log.Printf("Warning: Failed to connect to ML service: %v", err)
+		log.Printf("Warning: Failed to create ML client: %v", err)
 		log.Printf("Continuing without ML service (analysis will not work)")
 	}
 
 	// Create router
-	router := api.NewRouter(cache, milvus, ml)
+	router := api.NewRouter(cache, vs, ml, cfg.AllowedOrigins)
 
 	// Create server
 	srv := &http.Server{
 		Addr:         ":" + cfg.ServerPort,
 		Handler:      router,
 		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 120 * time.Second,
 	}
 
 	// Start server in goroutine
@@ -81,9 +81,6 @@ func main() {
 	// Cleanup connections
 	if cache != nil {
 		cache.Close()
-	}
-	if milvus != nil {
-		milvus.Close()
 	}
 	if ml != nil {
 		ml.Close()

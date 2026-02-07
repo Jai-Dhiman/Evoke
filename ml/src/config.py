@@ -2,7 +2,7 @@ import os
 
 
 class Config:
-    GRPC_PORT: int = int(os.getenv("GRPC_PORT", "50051"))
+    GRPC_PORT: int = int(os.getenv("PORT", os.getenv("GRPC_PORT", "50051")))
     GRPC_MAX_WORKERS: int = int(os.getenv("GRPC_MAX_WORKERS", "10"))
 
     CLIP_MODEL: str = os.getenv("CLIP_MODEL", "openai/clip-vit-base-patch32")
